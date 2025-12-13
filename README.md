@@ -12,8 +12,8 @@ MCP-сервер для поиска и анализа рекламы из Faceb
 
 ```bash
 # 1. Клонируй репозиторий
-git clone https://github.com/YOUR_USERNAME/manual_server.git
-cd manual_server
+git clone https://github.com/whygithub7/MySpy-Antigravity.git
+
 
 # 2. Создай виртуальное окружение
 python -m venv venv
@@ -39,20 +39,20 @@ GEMINI_API_KEY=твой_ключ_gemini
 
 ## Последний шаг: установка MCP в Antigravity
 
-Добавь в `mcp_config.json`:
+Добавь в `mcp_config.json`. **Важно:** используй *абсолютные пути* к папке проекта.
 
 ```json
 {
   "mcpServers": {
     "fb_ad_library": {
-      "command": "path/to/manual_server/venv/Scripts/python.exe",
+      "command": "C:\\full\\path\\to\\MySpy-Antigravity\\venv\\Scripts\\python.exe",
       "args": [
-        "path/to/manual_server/manual_mcp.py"
+        "C:\\full\\path\\to\\MySpy-Antigravity\\manual_mcp.py"
       ],
       "env": {
         "PYTHONIOENCODING": "utf-8",
         "PYTHONUNBUFFERED": "1",
-        "PYTHONPATH": "path/to/manual_server",
+        "PYTHONPATH": "C:\\full\\path\\to\\MySpy-Antigravity",
         "USERPROFILE": "C:\\Users\\YOUR_USERNAME",
         "PATH": "C:\\Windows\\system32;C:\\Windows;C:\\Program Files\\Git\\cmd"
       }
