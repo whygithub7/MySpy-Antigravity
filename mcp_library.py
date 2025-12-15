@@ -42,18 +42,39 @@ except Exception:
 
 # Excluded domains
 EXCLUDED_DOMAINS = [
-    'page.', '*.reader.', '*.read.', '*.book.',
-    'hotmart', 'udemy', 'coursera', 'teachable',
-    'pay.', 'g.co', 'amazon.com', 'amzn.', 'ebay.', 'aliexpress', 'mercadolibre', 'mercadolivre',
+    # General Marketplaces (Global/EU/LATAM)
+    'amazon', 'amzn', 'ebay', 'aliexpress', 'alibaba', 'temu', 'shein', 'shopee', 'dhgate',
+    'mercadolibre', 'mercadolivre', 'mercadopago', # LATAM giants
+    'falabella', 'linio', 'liverpool.com.mx', 'coppel', 'walmart', 'carrefour', 'elcorteingles', # Retailers
+    'wish.com', 'etsy', 'rakuten', 'zalando', 'asos', 'allegro', 'cdiscount', 'fnac', 'bol.com', # EU/Global
+    
+    # App Stores & Digital Content
+    'play.google.com', 'apps.apple.com', 'itunes.apple.com', 'app.apple.com',
+    'store.steampowered', 'epicgames', 'microsoft.com/store',
+    'wattpad', 'webtoon', 'goodreads', 'audible', '*.reader', '*.book',
+    
+    # Educational & Courses
+    'hotmart', 'udemy', 'coursera', 'teachable', 'skillshare', 'masterclass', 'domestika', 'crehana',
+    
+    # Payment & Services
+    'pay.', 'paypal', 'stripe', 'shopify.com', # myshopify is tricky, sometimes used for landings, but usually 'checkout' path filters it
+    
+    # Social & Messaging & Video (Internal/External)
+    'facebook', 'fb.me', 'fb.com', 'instagram', 'whatsapp', 'wa.me', 'messenger',
+    'twitter', 'x.com', 'tiktok', 'snapchat', 'pinterest', 'linkedin', 'reddit', 'tumblr',
+    'youtube', 'youtu.be', 'vimeo', 'dailymotion', 'twitch',
+    't.me', 'telegram', 'discord',
+    
+    # Google Services
+    'google', 'g.co', 'goo.gl', 'maps.app.goo.gl', 'forms.gle', 'drive.google', 'docs.google',
+    
+    # Medical/Wellness (Official/Telehealth)
+    'betterhelp', 'talkspace', 'doctoralia', 'mayoclinic', 'webmd', 'healthline',
     'network.mynursingcommunity.com',
-    # Psychology/Therapy
-    'betterhelp', 'talkspace', 'psychology',
-    # Sports/Fitness
-    'gymshark', 'myfitnesspal', 'nike.com', 'adidas.com', 'underarmour',
-    # General Wellness/Self-Help
-    'mindvalley', 'masterclass', 'skillshare',
-    # Social/Internal
-    'fb.me', 'facebook.com', 'instagram.com', 'whatsapp.com', 'wa.me', 'messenger.com', 't.me', 'telegram.me', 'youtube.com', 'youtu.be'
+    
+    # Sports/Branded Fitness
+    'nike', 'adidas', 'puma', 'underarmour', 'reebok', 'gymshark', 'decathlon',
+    'myfitnesspal', 'strava'
 ]
 
 # Excluded URL paths
@@ -61,7 +82,8 @@ EXCLUDED_URL_PATHS = [
     '/curso/', '/programa/', '/curso-online/', '/training/', '/academy/',
     '/shop/', '/store/', '/marketplace/', '/cart/', '/checkout/',
     '/psycholog', '/therapy/', '/counseling/', '/hypnosis/',
-    '/fitness/', '/gym/', '/workout/'
+    '/fitness/', '/gym/', '/workout/',
+    '/product/', '/item/'
 ]
 
 
