@@ -209,7 +209,7 @@ def get_ads(
 
     ads = []
     total_requests = 0
-    max_requests = 10  # Allow more requests for comprehensive data
+    max_requests = 10
     
     while len(ads) < limit and total_requests < max_requests:
         if cursor:
@@ -264,12 +264,13 @@ def get_ads(
 
 def search_ads_by_keyword(
     query: str,
-    limit: int = 50,
+    limit: int = 100,
     country: Optional[str] = None,
     ad_type: str = "ALL",
     media_type: str = "ALL",
     active_status: str = "ACTIVE",
-    trim: bool = True
+    trim: bool = True,
+    cursor: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Search for ads by keyword.
@@ -282,21 +283,19 @@ def search_ads_by_keyword(
         media_type: Type of media ("ALL", "IMAGE", "VIDEO").
         active_status: Status of ads ("ACTIVE", "ALL", "INACTIVE").
         trim: Whether to trim the response.
+        cursor: Optional cursor to start/resume search from.
     
     Returns:
         List of ad objects.
     """
     api_key = get_scrapecreators_api_key()
-    cursor = None
     headers = {
         "x-api-key": api_key,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     params = {
         "query": query,
-        # Documentation suggests GET requests generally support up to ~1500 results before cursor issues.
-        # Increased limit cap from 100 to 1500 to allow larger batches per credit.
-        "limit": min(limit, 1500),
+        "limit": min(limit, 1000), 
         "ad_type": ad_type,
         "media_type": media_type,
         "active_status": active_status
@@ -338,15 +337,19 @@ def search_ads_by_keyword(
             
             # The search API returns 'searchResults' instead of 'results'
             search_results = resJson.get('searchResults', [])
-            logger.info(f"Retrieved {len(search_results)} ads from search API (request {total_requests})")
+            logger.info(f"Retrieved {len(search_results)} ads from search API (request {total_requests}/{max_requests})")
             
+            # If empty results and no cursor, we are done
+            if not search_results:
+                 logger.info("Empty results received")
+                 
             # Transform the response to match the expected structure for parse_fb_ads
-            # parse_fb_ads expects {'results': [...]}
             transformed_response = {'results': search_results}
             
             # Use the same parser but don't filter inactive since API already filtered for ACTIVE
             res_ads = parse_fb_ads(transformed_response, trim, filter_inactive=False)
-            if len(res_ads) == 0:
+            
+            if len(res_ads) == 0 and not resJson.get('cursor'):
                 logger.info("No more ads found, stopping pagination")
                 break
                 

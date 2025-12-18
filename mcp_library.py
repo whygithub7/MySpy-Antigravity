@@ -467,7 +467,7 @@ def get_meta_platform_id(brand_names: Union[str, List[str]]) -> Dict[str, Any]:
 
 def search_facebook_ads(
     query: str,
-    limit: Optional[int] = 50,
+    limit: Optional[int] = 100,
     country: Optional[str] = None,
     active_status: str = "ACTIVE",
     media_type: str = "ALL",

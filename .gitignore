@@ -48,8 +48,8 @@ venv.bak/
 mcp_debug_manual.log
 
 # Results and Cache
-results/*.json
-results/*.md
+# results/*.json
+# results/*.md
 .cache/
 *.cache
 
@@ -68,7 +68,7 @@ htmlcov/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Project Specific
-# Keep results directory but ignore its contents
+
+
 results/*
 !results/.gitkeep
