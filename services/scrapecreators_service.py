@@ -270,7 +270,9 @@ def search_ads_by_keyword(
     media_type: str = "ALL",
     active_status: str = "ACTIVE",
     trim: bool = True,
-    cursor: Optional[str] = None
+    cursor: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Search for ads by keyword.
@@ -284,6 +286,9 @@ def search_ads_by_keyword(
         active_status: Status of ads ("ACTIVE", "ALL", "INACTIVE").
         trim: Whether to trim the response.
         cursor: Optional cursor to start/resume search from.
+        start_date: Filter ads that started after this date (YYYY-MM-DD).
+        end_date: Filter ads that started before this date (YYYY-MM-DD).
+                  Tip: to find ads active > N days, set end_date = today - N days.
     
     Returns:
         List of ad objects.
@@ -295,78 +300,70 @@ def search_ads_by_keyword(
     }
     params = {
         "query": query,
-        "limit": min(limit, 1000), 
-        "ad_type": ad_type,
+        "limit": min(limit, 100),
         "media_type": media_type,
         "active_status": active_status
     }
+    
+    if ad_type and ad_type.upper() != "ALL":
+        params["ad_type"] = ad_type
     
     if country:
         params["country"] = country.upper()
     if trim:
         params["trim"] = "true"
+    if start_date:
+        params["start_date"] = start_date
 
     ads = []
-    total_requests = 0
-    max_requests = 10
     
-    while len(ads) < limit and total_requests < max_requests:
-        if cursor:
-            params['cursor'] = cursor
+    try:
+        current_timeout = 120
+        # Always request the full limit (default 100) in one go
+        params['limit'] = limit
+        
+        logger.info(f"Searching ScrapeCreators for query '{query}' (limit={limit})")
+        response = requests.get(
+            SEARCH_ADS_API_URL, 
+            headers=headers, 
+            params=params,
+            timeout=current_timeout
+        )
         
         try:
-            response = requests.get(
-                SEARCH_ADS_API_URL, 
-                headers=headers, 
-                params=params,
-                timeout=30
-            )
-            total_requests += 1
+            check_credit_status(response)
+        except (CreditExhaustedException, RateLimitException):
+            raise
+        
+        if response.status_code != 200:
+            logger.error(f"Error {response.status_code}: {response.text[:200]}")
+            return []
             
-            try:
-                credit_info = check_credit_status(response)
-            except (CreditExhaustedException, RateLimitException):
-                raise
-            
-            if response.status_code != 200:
-                error_preview = response.text[:200] + "..." if len(response.text) > 200 else response.text
-                logger.error(f"Error searching ads for query '{query}': {response.status_code} {error_preview}")
-                break
-                
-            resJson = response.json()
-            
-            # The search API returns 'searchResults' instead of 'results'
-            search_results = resJson.get('searchResults', [])
-            logger.info(f"Retrieved {len(search_results)} ads from search API (request {total_requests}/{max_requests})")
-            
-            # If empty results and no cursor, we are done
-            if not search_results:
-                 logger.info("Empty results received")
-                 
-            # Transform the response to match the expected structure for parse_fb_ads
-            transformed_response = {'results': search_results}
-            
-            # Use the same parser but don't filter inactive since API already filtered for ACTIVE
-            res_ads = parse_fb_ads(transformed_response, trim, filter_inactive=False)
-            
-            if len(res_ads) == 0 and not resJson.get('cursor'):
-                logger.info("No more ads found, stopping pagination")
-                break
-                
+        resJson = response.json()
+        search_results = resJson.get('searchResults', [])
+        raw_count = len(search_results)
+        logger.info(f"Retrieved {raw_count} raw ads")
+        
+        if raw_count == 0:
+            return []
+        
+        # Transform and parse ALL variations/media objects
+        transformed_response = {'results': search_results}
+        res_ads = parse_fb_ads(transformed_response, trim, filter_inactive=False)
+        
+        if res_ads:
             ads.extend(res_ads)
+        
+        # Rule: if less than 100 returned the first time, don't demand other ads (pagination)
+        # However, if we got exactly 100 or more, we are satisfied.
+        # We don't use cursor/pagination here because of the 'one time' rule for < 100.
             
-            cursor = resJson.get('cursor')
-            if not cursor:
-                logger.info("No cursor found, reached end of results")
-                break
-                
-        except requests.RequestException as e:
-            logger.error(f"Network error while searching ads: {str(e)}")
-            break
-        except Exception as e:
-            logger.error(f"Error processing search response: {str(e)}")
-            break
+    except (CreditExhaustedException, RateLimitException):
+        raise
+    except Exception as e:
+        logger.error(f"Error in search: {str(e)}")
 
+    logger.info(f"Finished search. Total media objects captured: {len(ads)}")
     return ads[:limit]
 
 
@@ -584,6 +581,34 @@ def extract_all_urls_from_snapshot(snapshot: Dict[str, Any]) -> List[str]:
                     if url and isinstance(url, str) and url.strip():
                         urls.append(url.strip())
     
+    # Check for cards (DCO, CAROUSEL, DPA)
+    cards = snapshot.get('cards', [])
+    if isinstance(cards, list):
+        for card in cards:
+            if not isinstance(card, dict):
+                continue
+            # Direct link fields in card
+            for field in link_fields:
+                card_url = card.get(field)
+                if card_url and isinstance(card_url, str) and card_url.strip():
+                    urls.append(card_url.strip())
+            
+            # Nested call_to_action in card
+            card_cta = card.get('call_to_action', {})
+            if isinstance(card_cta, dict):
+                for field in link_fields:
+                    cta_url = card_cta.get(field)
+                    if cta_url and isinstance(cta_url, str) and cta_url.strip():
+                        urls.append(cta_url.strip())
+                
+                # Nested link object in card CTA
+                card_cta_link = card_cta.get('link', {})
+                if isinstance(card_cta_link, dict):
+                    for field in link_fields:
+                        l_url = card_cta_link.get(field)
+                        if l_url and isinstance(l_url, str) and l_url.strip():
+                            urls.append(l_url.strip())
+    
     # Check body text for URLs (regex-like simple extraction)
     body = snapshot.get('body', {})
     if isinstance(body, dict):
@@ -653,63 +678,74 @@ def parse_fb_ads(resJson: Dict[str, Any], trim: bool = True, filter_inactive: bo
             media_type = snapshot.get('display_format')
             
             # Skip unsupported media types
-            if media_type not in {'IMAGE', 'VIDEO', 'DCO'}:
+            if media_type not in {'IMAGE', 'VIDEO', 'DCO', 'CAROUSEL', 'DPA', 'MULTI_IMAGES'}:
                 continue
 
-            # Parse body text
-            body = snapshot.get('body', {})
-            if body:
-                bodies = [body.get('text')]
-            else:
-                bodies = [None]  # Allow empty body
-
-            # Parse title text
-            title = snapshot.get('title', {})
-            if title:
-                titles = [title.get('text') if isinstance(title, dict) else title]
-            else:
-                titles = [None]  # Allow empty title
+            # Parse bodies and titles
+            global_body = snapshot.get('body', {}).get('text') if isinstance(snapshot.get('body'), dict) else snapshot.get('body')
+            global_title = snapshot.get('title', {}).get('text') if isinstance(snapshot.get('title'), dict) else snapshot.get('title')
+            
+            bodies = []
+            titles = []
 
             # Parse media URLs based on type
             media_urls = []
-            if media_type == 'IMAGE':
+            card_media_types = []
+
+            if media_type in ('IMAGE', 'MULTI_IMAGES'):
                 images = snapshot.get('images', [])
-                if len(images) > 0:
-                    media_urls = [images[0].get('resized_image_url')]
+                for img in images:
+                    img_url = (img.get('resized_image_url') or img.get('original_image_url'))
+                    if img_url:
+                        media_urls.append(img_url)
+                        card_media_types.append('IMAGE')
+                        bodies.append(global_body)
+                        titles.append(global_title)
+                
+                # For plain IMAGE, limit to first
+                if media_type == 'IMAGE' and len(media_urls) > 1:
+                    media_urls = media_urls[:1]
+                    card_media_types = card_media_types[:1]
+                    bodies = bodies[:1]
+                    titles = titles[:1]
 
             elif media_type == 'VIDEO':
                 videos = snapshot.get('videos', [])
                 if len(videos) > 0:
-                    media_urls = [videos[0].get('video_sd_url')]
+                    vid_url = (videos[0].get('video_sd_url') or
+                              videos[0].get('video_hd_url') or
+                              videos[0].get('watermarked_video_sd_url') or
+                              videos[0].get('video_preview_image_url'))
+                    if vid_url:
+                        media_urls = [vid_url]
+                        card_media_types = ['VIDEO']
+                        bodies = [global_body]
+                        titles = [global_title]
 
-            elif media_type == 'DCO':
+            elif media_type in ('DCO', 'CAROUSEL', 'DPA'):
                 cards = snapshot.get('cards', [])
-                if len(cards) > 0:
-                    for card in cards:
-                        # Try different image URL fields
-                        img_url = (card.get('resized_image_url') or 
-                                  card.get('original_image_url') or 
-                                  card.get('video_preview_image_url'))
-                        if img_url:
-                            media_urls.append(img_url)
+                for card in cards:
+                    # Detect card media type
+                    vid_url = (card.get('video_sd_url') or card.get('video_hd_url'))
+                    img_url = (card.get('resized_image_url') or
+                              card.get('original_image_url') or
+                              card.get('video_preview_image_url'))
+                    
+                    m_url = vid_url or img_url
+                    if not m_url:
+                        continue
                         
-                        # Body can be string or dict
-                        card_body = card.get('body')
-                        if isinstance(card_body, str):
-                            bodies.append(card_body)
-                        elif isinstance(card_body, dict):
-                            bodies.append(card_body.get('text'))
-                        else:
-                            bodies.append(None)
-                        
-                        # Title can be string or dict
-                        card_title = card.get('title')
-                        if isinstance(card_title, str):
-                            titles.append(card_title)
-                        elif isinstance(card_title, dict):
-                            titles.append(card_title.get('text'))
-                        else:
-                            titles.append(None)
+                    media_urls.append(m_url)
+                    card_media_types.append('VIDEO' if vid_url else 'IMAGE')
+                    
+                    # Card specific text with fallback to global
+                    c_body = card.get('body')
+                    if isinstance(c_body, dict): c_body = c_body.get('text')
+                    bodies.append(c_body if c_body else global_body)
+                    
+                    c_title = card.get('title')
+                    if isinstance(c_title, dict): c_title = c_title.get('text')
+                    titles.append(c_title if c_title else global_title)
             
             # Skip only if no media content (body/title can be empty)
             if len(media_urls) == 0:
@@ -755,17 +791,22 @@ def parse_fb_ads(resJson: Dict[str, Any], trim: bool = True, filter_inactive: bo
                         external_urls.append(parsed_url)
 
             # Create ad objects
-            for media_url, body_text, title_text in zip(media_urls, bodies, titles):
+            for idx, (media_url, body_text, title_text) in enumerate(zip(media_urls, bodies, titles)):
                 if media_url is not None:  # Only require media, body/title can be empty
+                    # Resolve per-card media type (handles CAROUSEL with video cards)
+                    resolved_media_type = card_media_types[idx] if idx < len(card_media_types) else media_type
                     ad_obj = {
                         'ad_id': ad_id,
                         'start_date': start_date,
                         'end_date': end_date,
                         'media_url': media_url,
                         'body': body_text or '',  # Empty string if None
-                        'title': title_text or '',  # Empty string if None, but will be filtered out if empty in save_results
-                        'media_type': media_type,
+                        'title': title_text or '',
+                        'media_type': resolved_media_type,
+                        'display_format': media_type,  # original format (CAROUSEL, DCO etc.)
                         # URL information - always included
+                        'page_id': ad.get('page_id'),
+                        'page_name': ad.get('page_name') or snapshot.get('page_name'),
                         'destination_urls': destination_urls_parsed,
                         'destination_urls_full': [u['full_url'] for u in destination_urls_parsed],
                         'external_urls': external_urls,
@@ -778,8 +819,6 @@ def parse_fb_ads(resJson: Dict[str, Any], trim: bool = True, filter_inactive: bo
                     # Add additional fields if not trimming
                     if not trim:
                         ad_obj.update({
-                            'page_id': ad.get('page_id'),
-                            'page_name': ad.get('page_name'),
                             'currency': ad.get('currency'),
                             'funding_entity': ad.get('funding_entity'),
                             'impressions': ad.get('impressions'),

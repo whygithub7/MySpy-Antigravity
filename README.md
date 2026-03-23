@@ -33,7 +33,12 @@ copy .env.example .env
 
 ```env
 SCRAPECREATORS_API_KEY=твой_ключ_scrapecreators
-GEMINI_API_KEY=твой_ключ_gemini
+GEMINI_API_KEY=твой_основной_ключ_gemini
+
+# Ротация ключей (необязательно, но рекомендуется для больших объемов)
+# Список ключей через запятую. Скрипт будет переключаться между ними
+# при исчерпании лимитов (Error 429).
+GEMINI_API_KEYS=ключ1,ключ2,ключ3
 ```
 
 

@@ -87,7 +87,11 @@ def get_tools_list():
                     "target_file": {"type": "string"},
                     "append_mode": {"type": "boolean"},
                     "max_ads": {"type": "integer"},
-                    "apply_filtering": {"type": "boolean"}
+                    "apply_filtering": {"type": "boolean"},
+                    "start_date": {
+                        "type": "string",
+                        "description": "Filter: ads that started after this date (YYYY-MM-DD). E.g. '2025-01-01'."
+                    }
                 },
                 "required": ["query"]
             }
@@ -104,6 +108,27 @@ def get_tools_list():
                     "limit": {"type": "integer"},
                     "country": {"type": "string"},
                     "min_results": {"type": "integer"}
+                },
+                "required": ["platform_ids"]
+            }
+        },
+        {
+            "name": "get_fanpage_ads",
+            "description": "Fetch ALL ads from a Facebook fan page by its platform ID, then filter and analyze media with Gemini. Full pipeline: fetch → filter → Gemini analysis → save to file. Use this after getting a platform_id from get_meta_platform_id.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "platform_ids": {
+                        "anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}],
+                        "description": "One or more Facebook page platform IDs (from get_meta_platform_id)"
+                    },
+                    "limit": {"type": "integer", "description": "Max ads to fetch per page (default 50)"},
+                    "country": {"type": "string", "description": "Country code (e.g. US, MX)"},
+                    "analyze_media": {"type": "boolean", "description": "Enable Gemini media analysis (default true)"},
+                    "target_file": {"type": "string", "description": "Filename to save results"},
+                    "append_mode": {"type": "boolean", "description": "Append to existing file (default false)"},
+                    "max_ads": {"type": "integer", "description": "Max ads to save"},
+                    "apply_filtering": {"type": "boolean", "description": "Enable domain/content filtering (default true)"}
                 },
                 "required": ["platform_ids"]
             }
@@ -167,6 +192,35 @@ def get_tools_list():
                     "max_age_days": {"type": "integer"}
                  }
              }
+        },
+        {
+            "name": "retry_failed_gemini_analysis",
+            "description": "Retry Gemini analysis for ads that have failed or missing analysis in a local JSON file.",
+             "inputSchema": {
+                 "type": "object",
+                 "properties": {
+                    "json_file_path": {"type": "string"}
+                 },
+                 "required": ["json_file_path"]
+             }
+        },
+        {
+            "name": "clean_results_file",
+            "description": "Removes all 'white' stub ad cards from a JSON results file. Reads the file, deletes every card whose raw_analysis contains the word 'white', and saves the result.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "Name of the file in results/ directory (e.g. 'DE_Prostatitis.json')"
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": "If true (default), overwrites the original file. If false, saves as '<name>_cleaned.json'."
+                    }
+                },
+                "required": ["filename"]
+            }
         }
     ]
     return tools_info
@@ -178,11 +232,10 @@ def call_tool(name, arguments):
     elif name == "search_ads_final":
         # Map new tool name to the library function
         return mcp_library.search_facebook_ads(**arguments)
-    elif name == "get_meta_ads":
-        return mcp_library.get_meta_ads(**arguments)
-
     elif name == "get_meta_ads_external_only":
         return mcp_library.get_meta_ads_external_only(**arguments)
+    elif name == "get_fanpage_ads":
+        return mcp_library.get_fanpage_ads(**arguments)
     elif name == "analyze_ad_image":
         return mcp_library.analyze_ad_image(**arguments)
     elif name == "analyze_ad_video":
@@ -193,6 +246,10 @@ def call_tool(name, arguments):
         return mcp_library.search_cached_media(**arguments)
     elif name == "cleanup_media_cache":
         return mcp_library.cleanup_media_cache(**arguments)
+    elif name == "retry_failed_gemini_analysis":
+        return mcp_library.retry_failed_gemini_analysis(**arguments)
+    elif name == "clean_results_file":
+        return mcp_library.clean_results_file(**arguments)
     else:
         raise ValueError(f"Unknown tool: {name}")
 

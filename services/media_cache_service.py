@@ -160,6 +160,8 @@ class MediaCacheService:
             if result['analysis_results']:
                 try:
                     result['analysis_results'] = json.loads(result['analysis_results'])
+                    if isinstance(result['analysis_results'], dict):
+                        result['analysis_results'].pop('should_exclude', None)
                 except json.JSONDecodeError:
                     result['analysis_results'] = None
             
