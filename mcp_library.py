@@ -1100,7 +1100,7 @@ def analyze_ad_video(media_url: str, brand_name: str = None, ad_id: str = None, 
             # Important: Ensure the global config for THIS thread's upload session is correct
             import google.generativeai as genai
             genai.configure(api_key=api_key or get_gemini_api_key())
-            model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+            model = genai.GenerativeModel('gemini-3.1-flash-lite')
         
         # Upload to Gemini (now REST-based and takes api_key)
         gemini_file = upload_video_to_gemini(video_path, api_key=api_key)

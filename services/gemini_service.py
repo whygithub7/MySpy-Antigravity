@@ -153,7 +153,7 @@ def configure_gemini() -> genai.GenerativeModel:
     api_key = get_gemini_api_key()
     genai.configure(api_key=api_key)
 
-    model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+    model = genai.GenerativeModel('gemini-3.1-flash-lite')
 
     logger.info("Gemini API configured successfully")
     return model
@@ -266,7 +266,7 @@ def analyze_video_with_gemini(model: genai.GenerativeModel, video_file: File, pr
     if not api_key:
         api_key = get_gemini_api_key()
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     payload = {
@@ -339,7 +339,7 @@ def analyze_image_with_gemini(model: genai.GenerativeModel, image_bytes: bytes, 
     import base64
     image_b64 = base64.b64encode(image_bytes).decode('utf-8')
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     payload = {
@@ -560,7 +560,7 @@ def analyze_images_batch_with_gemini(image_data_list: List[Dict[str, Any]], prim
         api_key = get_gemini_api_key()
 
     import base64
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
 
     prompt = f"""
